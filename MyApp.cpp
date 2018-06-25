@@ -1,5 +1,6 @@
 #include "MyApp.hpp"
 #include <vector>
+#include <cmath>
 #include <GLES2/gl2.h>
 #include <EGL/egl.h>
 
@@ -16,46 +17,48 @@ static const char *vertex_shader_source =
     "uniform mat4 W;"\
     "uniform mat4 V;"\
     "uniform mat4 P;"\
-    "void main() {gl_Position = P*V*W*pos;}";
+    "uniform mat4 Rx;"\
+    "uniform mat4 Ry;"\
+    "void main() {gl_Position = P*V*W*Ry*Rx*pos;}";
 
 static const char *fragment_shader_source = "precision mediump float; void main() {gl_FragColor = vec4(1,1,1,1);}";
 
 static const GLfloat cube_vertices[] = {
     // top
-     1.0f,  1.0f, -1.0f,
-     1.0f,  1.0f,  1.0f,
-    -1.0f,  1.0f,  1.0f,
-    -1.0f,  1.0f, -1.0f,
+    -1.0f, 1.0f, -1.0f,
+    -1.0f, 1.0f,  1.0f,
+     1.0f, 1.0f,  1.0f,
+     1.0f, 1.0f, -1.0f,
 
     // bottom
-    -1.0f, -1.0f, -1.0f,
-    -1.0f, -1.0f,  1.0f,
-     1.0f, -1.0f,  1.0f,
-     1.0f, -1.0f, -1.0f,
-
-    // right
-     1.0f, 1.0f, -1.0f,
      1.0f,-1.0f, -1.0f,
      1.0f,-1.0f,  1.0f,
+    -1.0f,-1.0f,  1.0f,
+    -1.0f,-1.0f, -1.0f,
+
+    // right
      1.0f, 1.0f,  1.0f,
+     1.0f,-1.0f,  1.0f,
+     1.0f,-1.0f, -1.0f,
+     1.0f, 1.0f, -1.0f,
 
     // left
-    -1.0f, 1.0f, 1.0f,
-    -1.0f, -1.0f, 1.0f,
-    -1.0f, -1.0f, -1.0f,
     -1.0f, 1.0f, -1.0f,
+    -1.0f,-1.0f, -1.0f,
+    -1.0f,-1.0f,  1.0f,
+    -1.0f, 1.0f,  1.0f,
 
     // near side
-    1.0f, 1.0f, 1.0f,
-    1.0f,-1.0f, 1.0f,
-    -1.0f, -1.0f, 1.0f,
     -1.0f, 1.0f, 1.0f,
+    -1.0f,-1.0f, 1.0f,
+     1.0f,-1.0f, 1.0f,
+     1.0f, 1.0f, 1.0f,
 
     // far side
-    -1.0f, 1.0f, -1.0f,
-    -1.0f, -1.0f, -1.0f,
-    1.0f, -1.0f, -1.0f,
-    1.0f, 1.0f, -1.0f
+     1.0f, 1.0f, -1.0f,
+     1.0f,-1.0f, -1.0f,
+    -1.0f,-1.0f, -1.0f,
+    -1.0f, 1.0f, -1.0f
 };
 
 static const GLuint cube_indices[] = {
@@ -66,6 +69,9 @@ static const GLuint cube_indices[] = {
     16,17,18, 16,18,19,
     20,21,22, 20,22,23
 };
+
+static GLuint vbo = 0;
+static GLuint ibo = 0;
 
 static int CheckShaderStatus(GLuint shader) {
 
@@ -163,7 +169,7 @@ int MyApp::Init() {
         1.0f, 0.0f, 0.0f, 0.0f, // column 1
         0.0f, 1.0f, 0.0f, 0.0f, // column 2
         0.0f, 0.0f, 1.0f, 0.0f, // column 3
-        0.0f, 0.0f,-5.0f, 1.0f  // column 4
+        0.0f, 0.0f,15.0f, 1.0f  // column 4
     };
 
     float view[16] = {
@@ -191,7 +197,18 @@ int MyApp::Init() {
     glUniformMatrix4fv(view_transform, 1, GL_FALSE, view);
     glUniformMatrix4fv(projection_transform, 1, GL_FALSE, proj);
 
-    glClearColor(1.0f, 0.0f, 1.0f, 1.0f);
+    // Set vertices
+    glGenBuffers( 1, &vbo );
+    glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(cube_vertices), cube_vertices, GL_STATIC_DRAW);
+
+    glGenBuffers( 1, &ibo );
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(cube_indices), cube_indices, GL_STATIC_DRAW);
+
+    glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+
+    this->start_time = std::chrono::system_clock::now();
 
     return 0;
 }
@@ -207,14 +224,48 @@ void MyApp::Render() {
     }
     //printf("");
 
-    //glViewport(0, 0, width, height);
+    auto now = std::chrono::system_clock::now();
+    std::chrono::duration<double> t = now - this->start_time;
+
+	const float PI = 3.141593;
+    float a = (float)fmod(t.count(),PI*2.0);
+    float c = cosf(a);
+    float s = sinf(a);
+    float rx[16] = {
+        1.0f, 0.0f, 0.0f, 0.0f, // column 1
+        0.0f, c,    s,    0.0f, // column 2
+        0.0f, -s,   c,    0.0f, // column 3
+        0.0f, 0.0f, 0.0f, 1.0f  // column 4
+    };
+
+    a = (float)fmod(t.count()*0.9,PI*2.0);
+    c = cosf(a);
+    s = sinf(a);
+    float ry[16] = {
+        c,    0.0f, -s,   0.0f,
+        0.0f, 1.0f, 0.0f, 0.0f,
+        s,    0.0f, c,    0.0f,
+        0.0f, 0.0f, 0.0f, 1.0f
+    };
+
+    GLint rotation_x = glGetUniformLocation(program,"Rx");
+    GLint rotation_y = glGetUniformLocation(program,"Ry");
+    glUniformMatrix4fv(rotation_x, 1, GL_FALSE, rx);
+    glUniformMatrix4fv(rotation_y, 1, GL_FALSE, ry);
+
+    //unsigned int viewport_width = 1280;
+    //unsigned int viewport_height = 720;
+    //glViewport(0, 0, viewport_width, viewport_height);
+
     glClear(GL_COLOR_BUFFER_BIT);
 
     glUseProgram(program);
 
 
-	glBindBuffer( GL_ARRAY_BUFFER, 0 );
-	glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
+//	glBindBuffer( GL_ARRAY_BUFFER, 0 );
+//	glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
+	glBindBuffer( GL_ARRAY_BUFFER, vbo );
+	glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, ibo );
 
     GLuint vertex_attrib_index = 0;
 
@@ -223,9 +274,11 @@ void MyApp::Render() {
     GLboolean normalized = GL_FALSE;
     GLsizei stride = sizeof(float)*3;
     //glVertexAttribPointer(vertex_attrib_index, 3, GL_FLOAT, normalized, stride, cube_vertices );
+    glVertexAttribPointer(vertex_attrib_index, 3, GL_FLOAT, normalized, stride, 0 );
 
-    GLsizei num_elements_to_render = 12;
-    glDrawElements( GL_TRIANGLES, num_elements_to_render, GL_UNSIGNED_INT, cube_indices );
+    GLsizei num_elements_to_render = 36;
+    //glDrawElements( GL_TRIANGLES, num_elements_to_render, GL_UNSIGNED_INT, cube_indices );
+    glDrawElements( GL_TRIANGLES, num_elements_to_render, GL_UNSIGNED_INT, 0 );
 
     glDisableVertexAttribArray(vertex_attrib_index);
 }
