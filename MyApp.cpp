@@ -13,15 +13,30 @@ WasmApp *CreateWasmAppInstance() {
 static GLuint program = 0;
 
 static const char *vertex_shader_source =
-    "attribute vec4 pos;\n"\
+    "#version 300 es\n"\
+    "layout(location=0) in vec4 pos;\n"\
+    "layout(location=1) in vec3 n;\n"\
+    "out vec3 normal;\n"\
     "uniform mat4 W;"\
     "uniform mat4 V;"\
     "uniform mat4 P;"\
     "uniform mat4 Rx;"\
     "uniform mat4 Ry;"\
-    "void main() {gl_Position = P*V*W*Ry*Rx*pos;}";
+    "void main() {gl_Position = P*V*W*Ry*Rx*pos;normal=mat3(W*Ry*Rx)*n;}";
 
-static const char *fragment_shader_source = "precision mediump float; void main() {gl_FragColor = vec4(1,1,1,1);}";
+static const char *fragment_shader_source =
+    "#version 300 es\n"\
+    "precision mediump float;\n"\
+    "in vec3 normal;\n"\
+    "layout(location=0) out vec4 fc;\n"\
+    "uniform vec3 dir_to_light;\n"\
+    "void main() {"\
+        "vec3 n = normalize(normal);"\
+        "float d = dot(dir_to_light,n);"\
+        "float f = (d+1.0)*0.5;"\
+        "vec3 c = f*vec3(1.0,1.0,1.0) + (1.0-f)*vec3(0.2,0.2,0.2);"\
+        "fc = vec4(c.x,c.y,c.z,1.0);"\
+    "}";
 
 static const GLfloat cube_vertices[] = {
     // top
@@ -61,6 +76,39 @@ static const GLfloat cube_vertices[] = {
     -1.0f, 1.0f, -1.0f
 };
 
+static const GLfloat cube_normals[] = {
+    // top
+     0.0f, 1.0f, 0.0f,
+     0.0f, 1.0f, 0.0f,
+     0.0f, 1.0f, 0.0f,
+     0.0f, 1.0f, 0.0f,
+
+     0.0f,-1.0f, 0.0f,
+     0.0f,-1.0f, 0.0f,
+     0.0f,-1.0f, 0.0f,
+     0.0f,-1.0f, 0.0f,
+
+     1.0f, 0.0f, 0.0f,
+     1.0f, 0.0f, 0.0f,
+     1.0f, 0.0f, 0.0f,
+     1.0f, 0.0f, 0.0f,
+
+    -1.0f, 0.0f, 0.0f,
+    -1.0f, 0.0f, 0.0f,
+    -1.0f, 0.0f, 0.0f,
+    -1.0f, 0.0f, 0.0f,
+
+     0.0f, 0.0f, 1.0f,
+     0.0f, 0.0f, 1.0f,
+     0.0f, 0.0f, 1.0f,
+     0.0f, 0.0f, 1.0f,
+
+     0.0f, 0.0f,-1.0f,
+     0.0f, 0.0f,-1.0f,
+     0.0f, 0.0f,-1.0f,
+     0.0f, 0.0f,-1.0f
+};
+
 static const GLuint cube_indices[] = {
     0,1,2, 0,2,3,
     4,5,6, 4,6,7,
@@ -71,6 +119,7 @@ static const GLuint cube_indices[] = {
 };
 
 static GLuint vbo = 0;
+static GLuint nbo = 0;
 static GLuint ibo = 0;
 
 static int CheckShaderStatus(GLuint shader) {
@@ -197,16 +246,27 @@ int MyApp::Init() {
     glUniformMatrix4fv(view_transform, 1, GL_FALSE, view);
     glUniformMatrix4fv(projection_transform, 1, GL_FALSE, proj);
 
-    // Set vertices
+    // Set the light direction vector
+    float fv[] = {0.262705f, 0.938233f, 0.225176f};
+    GLint dir_to_light = glGetUniformLocation(program,"dir_to_light");
+    glUniform3fv(dir_to_light, 1, fv);
+
+    // Set vertices - for each element we call 'Generate', 'Bind', and 'Buffer' APIs.
     glGenBuffers( 1, &vbo );
     glBindBuffer(GL_ARRAY_BUFFER, vbo);
     glBufferData(GL_ARRAY_BUFFER, sizeof(cube_vertices), cube_vertices, GL_STATIC_DRAW);
+
+    glGenBuffers( 1, &nbo );
+    glBindBuffer(GL_ARRAY_BUFFER, nbo);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(cube_normals), cube_normals, GL_STATIC_DRAW);
 
     glGenBuffers( 1, &ibo );
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, sizeof(cube_indices), cube_indices, GL_STATIC_DRAW);
 
     glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+
+    glEnable(GL_DEPTH_TEST);
 
     this->start_time = std::chrono::system_clock::now();
 
@@ -261,20 +321,30 @@ void MyApp::Render() {
 
     glUseProgram(program);
 
-
-//	glBindBuffer( GL_ARRAY_BUFFER, 0 );
-//	glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
-	glBindBuffer( GL_ARRAY_BUFFER, vbo );
-	glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, ibo );
+    // Draws the cube model by calling OpenGL APIs
+    // glBindBuffer(): bind a named buffer object.
+    // glEnableVertexAttribArray(): enable a generic vertex attribute array.
+    // glVertexAttribPointer(): define an array of generic vertex attribute data.
 
     GLuint vertex_attrib_index = 0;
-
-    glEnableVertexAttribArray(vertex_attrib_index);
+    GLuint normal_attrib_index = 1;
 
     GLboolean normalized = GL_FALSE;
-    GLsizei stride = sizeof(float)*3;
+
+//  glBindBuffer( GL_ARRAY_BUFFER, 0 );
+//  glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, 0 );
+    glBindBuffer( GL_ARRAY_BUFFER, vbo );
+    glBindBuffer( GL_ELEMENT_ARRAY_BUFFER, ibo );
+
+    glEnableVertexAttribArray(vertex_attrib_index);
+    glVertexAttribPointer(vertex_attrib_index, 3, GL_FLOAT, normalized, sizeof(float)*3, 0);
+
+    // Drawing directly from a generic array - this does not work with emcc;
     //glVertexAttribPointer(vertex_attrib_index, 3, GL_FLOAT, normalized, stride, cube_vertices );
-    glVertexAttribPointer(vertex_attrib_index, 3, GL_FLOAT, normalized, stride, 0 );
+
+    glEnableVertexAttribArray(normal_attrib_index);
+    glBindBuffer(GL_ARRAY_BUFFER, nbo);
+    glVertexAttribPointer(normal_attrib_index, 3, GL_FLOAT, normalized, sizeof(float)*3, 0);
 
     GLsizei num_elements_to_render = 36;
     //glDrawElements( GL_TRIANGLES, num_elements_to_render, GL_UNSIGNED_INT, cube_indices );
