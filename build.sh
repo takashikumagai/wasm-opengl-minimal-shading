@@ -1,2 +1,1 @@
-emcc -s WASM=1 -s USE_WEBGL2=1 -s "EXTRA_EXPORTED_RUNTIME_METHODS=['ccall']" -s "EXPORTED_FUNCTIONS=[_wasm_init, _wasm_render]" -std=c++1z -I~/src/emsdk/emscripten/1.38.0/system/include Wasm.cpp MyApp.cpp
-
+emcc -s MIN_WEBGL_VERSION=2 -s MAX_WEBGL_VERSION=2 -s FULL_ES3=1 -s "EXPORTED_RUNTIME_METHODS=['ccall']" -s "EXPORTED_FUNCTIONS=[_wasm_init, _wasm_render, _wasm_onresize]" Wasm.cpp MyApp.cpp

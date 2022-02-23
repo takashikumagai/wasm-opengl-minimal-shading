@@ -5,8 +5,15 @@
     <meta http-equiv="X-UA-Compatible" content="IE=edge">
     <title>Wasm Demo</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="main.css">
 </head>
-<body>
+
+<!--
+    onresize event is fired multiple times, continuously as the windows is dragged and resized.
+    For instance, if you extend the windows a couple hundred pixel on your monitor,
+    onresize event is likely fired over ten times.
+-->
+<body><!-- onresize="console.log('window resized')"> -->
     <script type="text/javascript">
 
         var Module = {
@@ -14,6 +21,12 @@
                 console.log("onRuntimeInitialized###");
                 Module.ccall('wasm_init', null, [], []);
                 //Module._foobar(); // foobar was exported
+
+                var ctx = document.getElementById('mycanvas').getContext('webgl2');
+                ctx.canvas.width  = document.body.clientWidth;
+                ctx.canvas.height = document.body.clientHeight;
+
+                Module.ccall('wasm_onresize', null, ['number','number'], [document.body.clientWidth,document.body.clientHeight]);
 
                 function render() {
                     Module.ccall('wasm_render', null, [], []); // Call the c function 'void wasm_render()'
@@ -46,6 +59,16 @@
 
             window.requestAnimationFrame(render);
             };*/
+        }
+
+        window.onresize = function() {
+            console.log('window.onresize');
+
+            var ctx = document.getElementById('mycanvas').getContext('webgl2');
+            ctx.canvas.width  = document.body.clientWidth;// window.innerWidth;
+            ctx.canvas.height = document.body.clientHeight;// window.innerHeight;
+
+            Module.ccall('wasm_onresize', null, ['number','number'], [document.body.clientWidth,document.body.clientHeight]);
         }
 
     </script>

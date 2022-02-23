@@ -20,6 +20,8 @@ public:
     virtual int Init() { return 0; }
 
     virtual void Render() = 0;
+
+    virtual void OnResize(unsigned int width, unsigned int height) {}
 };
 
 
@@ -37,6 +39,8 @@ public:
     int Init(const char *target_canvas_element_id, unsigned int width, unsigned int height);
 
     void Render();
+
+    void OnResize(unsigned int width, unsigned int height);
 };
 
 

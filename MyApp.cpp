@@ -353,3 +353,7 @@ void MyApp::Render() {
     glDisableVertexAttribArray(vertex_attrib_index);
 }
 
+void MyApp::OnResize(unsigned int width, unsigned int height) {
+
+    glViewport(0,0,width,height);
+}

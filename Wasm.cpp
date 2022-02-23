@@ -17,13 +17,6 @@ Wasm::~Wasm() {
 
 int Wasm::Init(const char *target_canvas_element_id, unsigned int width, unsigned int height) {
 
-    wasm_app_instance = CreateWasmAppInstance();
-
-    if(!wasm_app_instance) {
-        console_log("CreateWasmAppInstance returned null.");
-        return -1;
-    }
-
     // Context configurations
     EmscriptenWebGLContextAttributes attrs;
     attrs.explicitSwapControl = 0;
@@ -33,6 +26,8 @@ int Wasm::Init(const char *target_canvas_element_id, unsigned int width, unsigne
     attrs.majorVersion = 2;
     attrs.minorVersion = 0;
 
+    // When it succeeds, this internally creates a context of type 'webgl2'.
+    // Subsequent calls to canvas.getContext('2d') in JS throws an error saying a context of different type already exists.
     webgl_context = emscripten_webgl_create_context(target_canvas_element_id, &attrs);
     if(webgl_context < 0)
         console_log("Failed to create a WebGL context.\n");
@@ -41,6 +36,13 @@ int Wasm::Init(const char *target_canvas_element_id, unsigned int width, unsigne
 
     if(res < 0) {
         console_log("!!!ewmcc");
+        return -1;
+    }
+
+    wasm_app_instance = CreateWasmAppInstance();
+
+    if(!wasm_app_instance) {
+        console_log("CreateWasmAppInstance returned null.");
         return -1;
     }
 
@@ -67,11 +69,25 @@ void Wasm::Render() {
     }
 }
 
+void Wasm::OnResize(unsigned int width, unsigned int height) {
+
+    EMSCRIPTEN_RESULT res = emscripten_webgl_make_context_current(webgl_context);
+
+    if(res != EMSCRIPTEN_RESULT_SUCCESS) {
+        console_log("WebGL context error\n");
+    }
+
+    if(wasm_app_instance)
+        wasm_app_instance->OnResize(width,height);
+    else {
+        console_log("!wasm_app_instance");
+    }
+}
 
 void console_log(const std::string& text) {
 
     EM_ASM_({
-        console.log("wasm:",Pointer_stringify($0));
+        console.log("wasm:",UTF8ToString($0));
     }, text.c_str());
 }
 
@@ -83,7 +99,7 @@ extern "C" {
      */
     int wasm_init() {
         console_log("wasm_init");
-        return wasm.Init("mycanvas",1280,720);
+        return wasm.Init("#mycanvas",1280,720);
     }
 
 
@@ -91,4 +107,7 @@ extern "C" {
         wasm.Render();
     }
 
+    void wasm_onresize(unsigned int width, unsigned int height) {
+        wasm.OnResize(width,height);
+    }
 }

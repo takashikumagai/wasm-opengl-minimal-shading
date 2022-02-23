@@ -14,6 +14,8 @@ public:
     int Init();
 
     void Render();
+
+    void OnResize(unsigned int width, unsigned int height);
 };
 
 #endif /* __amorphous_MyApp__ */

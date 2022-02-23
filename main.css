@@ -1,0 +1,33 @@
+/*
+https://stackoverflow.com/questions/6654958/make-body-have-100-of-the-browser-height
+*/
+html {
+}
+html, body {
+    padding:0;
+    margin:0;
+    height: 100vh;
+
+}
+/*
+https://stackoverflow.com/questions/6654958/make-body-have-100-of-the-browser-height/25829844#25829844
+*/
+body {
+    max-width: 100vw;
+    overflow: hidden;
+    /* -webkit-scroll-bar: none;  */
+}
+
+#outer {
+    display: inline-block;
+}
+
+#mycontainer {
+    /* Without this, the line height keeps growing */
+    line-height: 0;
+
+    /* Vertical scroll bar shows up when it shouldn't when html and body height are both set to 100% */
+    /* Neither of the two below worked on Chrome. */
+    /*display: inline-block;*/
+    float: left;
+}
